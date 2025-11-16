@@ -27,15 +27,16 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-## ⚠️ Important: Vercel Deployment Issue
+## Deployment on Vercel
 
-**Vercel is blocked by signbsl.com** - You'll get `403 Forbidden` errors because signbsl.com blocks Vercel's IP addresses.
+**✅ Now works on Vercel!** - The app uses **client-side scraping** to bypass server restrictions.
 
-**✅ Recommended:** Deploy to **Railway.app** instead (see `DEPLOYMENT_SOLUTIONS.md` for detailed instructions)
+### How it works:
+- Scraping happens in your browser (not on Vercel's servers)
+- No 403 errors because requests come from your IP, not Vercel's
+- Works on any deployment platform
 
----
-
-## Deployment on Vercel (Not Recommended - Will Be Blocked)
+## Deploy to Vercel
 
 ### Prerequisites
 - A Vercel account
@@ -141,16 +142,18 @@ The `vercel.json` file includes:
 ## How It Works
 
 1. User enters a phrase (e.g., "black hat")
-2. API route splits phrase into words
-3. Scrapes signbsl.com for each word
-4. Returns video URLs and metadata
+2. **Client-side JavaScript** splits phrase into words
+3. **Browser** fetches HTML directly from signbsl.com for each word
+4. **DOMParser** extracts video URLs from the HTML
 5. Combined player displays videos sequentially
+
+**Why client-side?** Server-side scraping gets blocked (403). By scraping in the browser, requests come from the user's IP, not from Vercel's servers.
 
 ## Tech Stack
 
 - **Framework**: Next.js 16 (App Router)
 - **Language**: TypeScript
 - **Styling**: TailwindCSS 4
-- **Scraping**: Cheerio
+- **Scraping**: DOMParser (client-side)
 - **Icons**: Lucide React
-- **Deployment**: Vercel
+- **Deployment**: Vercel, Railway, or any platform

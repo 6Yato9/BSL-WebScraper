@@ -30,16 +30,85 @@ export default function Home() {
     setResults([]);
 
     try {
-      const response = await fetch(`/api/scrape?phrase=${encodeURIComponent(searchPhrase)}`);
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch results');
+      // Split phrase into words
+      const words = searchPhrase.toLowerCase().trim().split(/\s+/).filter(w => w.length > 0);
+      
+      if (words.length === 0) {
+        throw new Error('No valid words found in phrase');
       }
 
-      setResults(data.results);
+      const wordResults: WordResult[] = [];
 
-      if (data.results.length === 0) {
+      // Fetch and parse each word (client-side to avoid 403)
+      for (const word of words) {
+        try {
+          const url = `https://www.signbsl.com/sign/${encodeURIComponent(word)}`;
+          
+          // Fetch HTML from the browser (not blocked)
+          const response = await fetch(url, {
+            mode: 'cors',
+            credentials: 'omit',
+          });
+
+          if (!response.ok) {
+            console.warn(`Failed to fetch ${word}: ${response.status}`);
+            continue;
+          }
+
+          const html = await response.text();
+          
+          // Parse HTML using DOMParser (works in browser)
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(html, 'text/html');
+
+          // Find video elements
+          const videoSources = doc.querySelectorAll('video source');
+          
+          if (videoSources.length > 0) {
+            // Get first video
+            const firstSource = videoSources[0] as HTMLSourceElement;
+            const videoUrl = firstSource.getAttribute('src');
+            const videoElement = firstSource.closest('video');
+            const posterUrl = videoElement?.getAttribute('poster');
+
+            if (videoUrl) {
+              wordResults.push({
+                word,
+                videos: [{
+                  word,
+                  videoUrl,
+                  posterUrl: posterUrl || '',
+                  source: 'signbsl.com',
+                }],
+              });
+            }
+          } else {
+            // Try meta tag fallback
+            const metaVideo = doc.querySelector('meta[property="og:video"]');
+            const metaPoster = doc.querySelector('meta[property="og:image"]');
+            const videoUrl = metaVideo?.getAttribute('content');
+            const posterUrl = metaPoster?.getAttribute('content');
+
+            if (videoUrl) {
+              wordResults.push({
+                word,
+                videos: [{
+                  word,
+                  videoUrl,
+                  posterUrl: posterUrl || '',
+                  source: 'signbsl.com',
+                }],
+              });
+            }
+          }
+        } catch (err) {
+          console.error(`Error fetching ${word}:`, err);
+        }
+      }
+
+      setResults(wordResults);
+
+      if (wordResults.length === 0) {
         setError('No videos found for the searched phrase. Please try different words.');
       }
     } catch (err) {
