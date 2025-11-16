@@ -43,6 +43,7 @@ export async function GET(request: NextRequest) {
 
     for (const word of words) {
       const url = `https://www.signbsl.com/sign/${encodeURIComponent(word)}`;
+      console.log(`[DEBUG] Fetching URL for word "${word}":`, url);
       
       try {
         const response = await fetch(url, {
@@ -54,24 +55,38 @@ export async function GET(request: NextRequest) {
             'DNT': '1',
             'Connection': 'keep-alive',
             'Upgrade-Insecure-Requests': '1',
+            'Referer': 'https://www.signbsl.com/',
           },
           cache: 'no-store',
         });
 
+        console.log(`[DEBUG] Response status for "${word}":`, response.status, response.statusText);
+
         if (!response.ok) {
-          console.error(`Failed to fetch ${word}: ${response.status} ${response.statusText}`);
+          console.error(`[ERROR] Failed to fetch ${word}: ${response.status} ${response.statusText}`);
           continue;
         }
 
         const html = await response.text();
+        console.log(`[DEBUG] HTML length for "${word}":`, html.length);
+        console.log(`[DEBUG] HTML preview for "${word}":`, html.substring(0, 500));
+        
         const $ = cheerio.load(html);
 
         const videos: VideoData[] = [];
 
-        // Find all video elements
-        $('video source').each((_, element) => {
+        // Find all video elements with multiple selector strategies
+        console.log(`[DEBUG] Searching for videos in "${word}"...`);
+        
+        // Strategy 1: Look for video source elements
+        const videoSources = $('video source');
+        console.log(`[DEBUG] Found ${videoSources.length} video source elements`);
+        
+        videoSources.each((_, element) => {
           const videoUrl = $(element).attr('src');
           const posterUrl = $(element).parent().attr('poster');
+          
+          console.log(`[DEBUG] Video URL found:`, videoUrl);
           
           // Get the source info from the nearby text
           const videoContainer = $(element).closest('[itemprop="video"]');
@@ -87,15 +102,45 @@ export async function GET(request: NextRequest) {
           }
         });
 
+        // Strategy 2: Look for direct video URLs in meta tags
+        if (videos.length === 0) {
+          console.log(`[DEBUG] Trying meta tag strategy for "${word}"...`);
+          const metaVideoUrl = $('meta[property="og:video"]').attr('content');
+          const metaPosterUrl = $('meta[property="og:image"]').attr('content');
+          
+          if (metaVideoUrl) {
+            console.log(`[DEBUG] Found video in meta tag:`, metaVideoUrl);
+            videos.push({
+              word,
+              videoUrl: metaVideoUrl,
+              posterUrl: metaPosterUrl || '',
+              source: 'signbsl.com',
+            });
+          }
+        }
+
+        console.log(`[DEBUG] Total videos found for "${word}":`, videos.length);
+
         if (videos.length > 0) {
           // Only include the first video for each word
           results.push({ word, videos: [videos[0]] });
+          console.log(`[DEBUG] Added video for "${word}":`, videos[0].videoUrl);
+        } else {
+          console.warn(`[WARN] No videos found for "${word}"`);
         }
       } catch (error) {
-        console.error(`Error scraping word "${word}":`, error);
+        console.error(`[ERROR] Error scraping word "${word}":`, error);
+        if (error instanceof Error) {
+          console.error(`[ERROR] Error message:`, error.message);
+          console.error(`[ERROR] Error stack:`, error.stack);
+        }
       }
     }
 
+    console.log(`[DEBUG] Final results:`, JSON.stringify(results, null, 2));
+    console.log(`[DEBUG] Total words processed:`, words.length);
+    console.log(`[DEBUG] Total words with videos:`, results.length);
+    
     const response = NextResponse.json({ results });
     
     // Add CORS headers
