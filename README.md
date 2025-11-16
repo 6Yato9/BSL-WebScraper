@@ -27,7 +27,15 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-## Deployment on Vercel
+## ⚠️ Important: Vercel Deployment Issue
+
+**Vercel is blocked by signbsl.com** - You'll get `403 Forbidden` errors because signbsl.com blocks Vercel's IP addresses.
+
+**✅ Recommended:** Deploy to **Railway.app** instead (see `DEPLOYMENT_SOLUTIONS.md` for detailed instructions)
+
+---
+
+## Deployment on Vercel (Not Recommended - Will Be Blocked)
 
 ### Prerequisites
 - A Vercel account
@@ -55,22 +63,73 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 ### Troubleshooting Vercel Deployment
 
-If videos don't load after deployment:
+If you get "No videos found" error after deployment:
 
-1. **Check Function Logs:**
-   - Go to your Vercel project dashboard
-   - Navigate to "Deployments" → Click on latest deployment → "Functions"
-   - Look for errors in `/api/scrape` function
+#### **Step 1: Check Function Logs**
 
-2. **Common Issues:**
-   - **Timeout**: Serverless functions have time limits (60s on Pro, 10s on Hobby)
-   - **Rate Limiting**: signbsl.com may block too many requests
-   - **CORS**: Headers are configured in `vercel.json`
+1. Go to your Vercel project dashboard
+2. Navigate to **Deployments** → Click on your latest deployment
+3. Click on **Functions** tab
+4. Click on `/api/scrape` function
+5. Look for `[DEBUG]`, `[ERROR]`, or `[WARN]` messages
 
-3. **Solutions:**
-   - Upgrade to Vercel Pro for longer function timeouts
-   - Add delays between requests if rate limited
-   - Check browser console for client-side errors
+**What to look for:**
+- `[DEBUG] Response status`: Should be `200 OK`
+- `[DEBUG] HTML length`: Should be > 0
+- `[DEBUG] Found X video source elements`: Should be > 0
+- `[ERROR]` messages indicate what went wrong
+
+#### **Step 2: Test the Connection**
+
+Visit this URL in your browser (replace `your-app` with your Vercel domain):
+```
+https://your-app.vercel.app/api/test
+```
+
+This will test if Vercel can connect to signbsl.com and return diagnostic info.
+
+**Expected response:**
+```json
+{
+  "success": true,
+  "status": 200,
+  "htmlLength": 50000+,
+  "hasVideoTag": true,
+  "hasSourceTag": true
+}
+```
+
+#### **Step 3: Common Issues & Solutions**
+
+**Issue 1: HTML length is 0 or very small**
+- **Cause**: signbsl.com is blocking Vercel's servers
+- **Solution**: They may have anti-bot protection. Try:
+  - Deploying to a different region in Vercel
+  - Using a proxy service
+  - Contact signbsl.com for API access
+
+**Issue 2: Timeout errors**
+- **Cause**: Scraping takes too long
+- **Solution**: 
+  - Upgrade to Vercel Pro (60s timeout vs 10s on Hobby)
+  - Reduce number of words searched at once
+
+**Issue 3: Status 403 or 429**
+- **Cause**: Rate limiting or blocked IP
+- **Solution**: signbsl.com is actively blocking the requests
+
+**Issue 4: Works locally but not on Vercel**
+- **Cause**: Different IP addresses, Vercel's serverless environment
+- **Solution**: This is the most common issue with web scraping deployments
+
+#### **Step 4: Alternative Solutions**
+
+If scraping doesn't work on Vercel:
+
+1. **Self-host**: Deploy to a VPS (DigitalOcean, Linode, etc.) where you have more control
+2. **Use a proxy**: Add a proxy service to route requests
+3. **Contact BSL**: Ask if they have an official API
+4. **Build a cache**: Pre-scrape common words and cache the results
 
 ### Vercel Configuration
 
