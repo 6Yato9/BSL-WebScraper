@@ -8,6 +8,10 @@ export interface VideoData {
   source: string;
 }
 
+export const runtime = 'nodejs'; // Required for cheerio
+export const dynamic = 'force-dynamic'; // Disable caching
+export const maxDuration = 60; // Maximum execution time in seconds
+
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
@@ -43,12 +47,19 @@ export async function GET(request: NextRequest) {
       try {
         const response = await fetch(url, {
           headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'DNT': '1',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
           },
+          cache: 'no-store',
         });
 
         if (!response.ok) {
-          console.error(`Failed to fetch ${word}: ${response.status}`);
+          console.error(`Failed to fetch ${word}: ${response.status} ${response.statusText}`);
           continue;
         }
 
@@ -85,12 +96,36 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ results });
+    const response = NextResponse.json({ results });
+    
+    // Add CORS headers
+    response.headers.set('Access-Control-Allow-Origin', '*');
+    response.headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    response.headers.set('Access-Control-Allow-Headers', 'Content-Type');
+    
+    return response;
   } catch (error) {
     console.error('Server error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
+    console.error('Error details:', errorMessage);
+    
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        error: 'Internal server error',
+        details: process.env.NODE_ENV === 'development' ? errorMessage : undefined 
+      },
       { status: 500 }
     );
   }
+}
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    },
+  });
 }
